@@ -6,43 +6,54 @@ library(spatstat)
 require(VBmix)
 require(MixAll)
 require(EMMIXcskew)
+require(caret)
 
-Star_dat <- read.csv("ngc_2360_withproba.csv",header = TRUE) %>% 
+Star_dat <- read.csv("bad_fsr_0735_large_noproba.csv",header = TRUE) %>% 
   #select(.,-"proba") %>%
             filter(.,phot_g_mean_mag < 20)  %>% 
             na.omit() %>% select(c("ra","dec","parallax","pmra","pmdec","phot_g_mean_mag",
            "phot_bp_mean_mag","phot_rp_mean_mag")) %>%
-  mutate(.,bp.rp = phot_bp_mean_mag - phot_rp_mean_mag)
+  mutate(.,bp.rp = phot_bp_mean_mag - phot_rp_mean_mag) %>%
+  mutate(.,Nparallax = spatialSign(parallax))
 
-features <- c("pmra","pmdec")
+features <- c("ra","dec","pmra","pmdec","Nparallax")
 
-Star_CL <- Mclust(Star_dat[,features],G=1:20)
+Star_CL <- Mclust(Star_dat[,features],G=1:40)
 Star_labels <- Star_CL$classification
 Star_dat$labels <- as.factor(Star_labels)
 
 
+mat <- matrix(c(iris[,1],iris[,2]), nrow=nrow(iris), byrow=TRUE)
 
+Image3 <- readData(iris[,1:2])
 
+radon(as.Image(iris[,1:2]))
 
-temp_dat <-  Star_dat
-i <- 1
-for (i in 1:10){
-Star_CL <- Mclust(temp_dat[,features],G=1:20)
-Star_labels <- Star_CL$classification
-temp_dat$labels <- as.factor(Star_labels)
-  
-surv <- which(sqrt(Star_CL$parameters$variance$scale) <= 1 )
-temp_dat <- temp_dat[Star_CL$classification %in%surv,]
-i <- i  + 1  
-}
+rad = radon(t(im))$rData
 
 
 
 ggplot(Star_dat,aes(x=pmra,y=pmdec,group=labels,color=labels,alpha=0.1)) + 
   geom_point() + 
 #  facet_wrap(.~labels) +
-  theme_bw() + theme(legend.position =  "none") +
-  geom_density2d()  
+  theme_bw() + theme(legend.position =  "none") 
+#+
+#  geom_density2d()  
+
+
+plot_ly(Star_dat, x = ~pmra,  y = ~parallax, z = ~-pmdec,color = ~labels) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'pmra'),
+                      yaxis = list(title = 'parallax [mas]'),
+                      zaxis = list(title = 'pmdec')))
+
+
+
+ggplot(Star_dat,aes(x= bp.rp,y=phot_g_mean_mag,group=labels,color = parallax, alpha=0.1)) + 
+  geom_point(size=0.2) + facet_wrap(.~labels) +
+  theme_bw() + theme() +
+  #  geom_density2d() +
+  scale_y_reverse() + scale_color_viridis_c()
 
 
 ggplot(Star_dat,aes(x=pmra,y=pmdec,group=labels,color=labels,alpha=0.1)) + 
@@ -61,11 +72,7 @@ ggplot(Star_dat,aes(x=ra,y=dec,group=labels,color=labels,alpha=0.1)) +
   theme_bw() + theme(legend.position =  "none") +
   geom_density2d()
 
-ggplot(Star_dat,aes(x= bp.rp,y=phot_g_mean_mag,group=labels,color = parallax, alpha=0.1)) + 
-  geom_point(size=0.2) + facet_wrap(.~labels) +
-  theme_bw() + theme() +
-#  geom_density2d() +
-  scale_y_reverse() + scale_color_viridis_c()
+
 
 
 
@@ -78,6 +85,17 @@ ggplot(Star_dat,aes(x= bp.rp,y=phot_g_mean_mag)) +
 
 
 
+temp_dat <-  Star_dat
+i <- 1
+for (i in 1:10){
+  Star_CL <- Mclust(temp_dat[,features],G=1:20)
+  Star_labels <- Star_CL$classification
+  temp_dat$labels <- as.factor(Star_labels)
+  
+  surv <- which(sqrt(Star_CL$parameters$variance$scale) <= 1 )
+  temp_dat <- temp_dat[Star_CL$classification %in%surv,]
+  i <- i  + 1  
+}
 
 
 spatial_test <- function(dat){

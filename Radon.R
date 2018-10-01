@@ -11,11 +11,11 @@ display(rad)
 display(t(im))
 
 
-irP1 <- iradon(rad)
+
 
 P <- phantom()
 R <- radon(P)
 ir <- iradon(rad, XSamples=257, YSamples=257)
-
+display(ir$irData)
 
 rm(P,R)
