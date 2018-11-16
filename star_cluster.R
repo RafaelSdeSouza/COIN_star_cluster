@@ -1,78 +1,61 @@
-require(dplyr)
-require(magrittr)
-library(factoextra)
-require(mclust)
-library(spatstat)
-require(VBmix)
-require(MixAll)
-require(EMMIXcskew)
-require(caret)
+require(dplyr);require(magrittr);
+require(mclust);library(spatstat);require(VBmix);require(dbscan)
+#require(MixAll);require(EMMIXcskew);
+require(caret);library(plotly);require(clues);require(rebmix);require(MeanShift)
 
-Star_dat <- read.csv("bad_fsr_0735_large_noproba.csv",header = TRUE) %>% 
+Star_dat <- read.csv("Perseus_gap_l140_150_b0_2_5.csv",header = TRUE) %>% 
   #select(.,-"proba") %>%
-            filter(.,phot_g_mean_mag < 20)  %>% 
-            na.omit() %>% select(c("ra","dec","parallax","pmra","pmdec","phot_g_mean_mag",
-           "phot_bp_mean_mag","phot_rp_mean_mag")) %>%
+#            filter(.,phot_g_mean_mag < 20)  %>% 
+            na.omit() %>% 
+#  select(.,c("ra","dec","b","l","parallax","pmra","pmdec","phot_g_mean_mag",
+#           "phot_bp_mean_mag","phot_rp_mean_mag")) %>%
   mutate(.,bp.rp = phot_bp_mean_mag - phot_rp_mean_mag) %>%
-  mutate(.,Nparallax = spatialSign(parallax))
+  mutate(.,Nparallax = spatialSign(parallax)) %>%
+  filter(b >= 1.75 & b <= 2) %>% filter(l >=142.5 & l <=145)
 
-features <- c("ra","dec","pmra","pmdec","Nparallax")
-
-Star_CL <- Mclust(Star_dat[,features],G=1:40)
-Star_labels <- Star_CL$classification
-Star_dat$labels <- as.factor(Star_labels)
+features <- c("pmra","pmdec","Nparallax")
+s_Dat <- as.data.frame(Star_dat[,features])
 
 
-mat <- matrix(c(iris[,1],iris[,2]), nrow=nrow(iris), byrow=TRUE)
-
-Image3 <- readData(iris[,1:2])
-
-radon(as.Image(iris[,1:2]))
-
-rad = radon(t(im))$rData
+#vtess <- deldir(s_Dat )
 
 
 
-ggplot(Star_dat,aes(x=pmra,y=pmdec,group=labels,color=labels,alpha=0.1)) + 
+#Star_CL <- Mclust(s_Dat,G=1:30)
+#Star_labels <- Star_CL$classification
+#Star_dat$labels <- as.factor(Star_labels)
+
+Star_CL <- hdbscan(s_Dat,minPts = 10)
+Star_dat$labels <- as.factor(Star_CL$cluster)
+Star_dat$out  <- Star_CL$outlier_scores
+
+
+ggplot(Star_dat,aes(x=pmra,y=pmdec,group=labels,color=labels,alpha=out)) + 
   geom_point() + 
-#  facet_wrap(.~labels) +
-  theme_bw() + theme(legend.position =  "none") 
-#+
-#  geom_density2d()  
+  facet_wrap(.~labels,scales = "free") +
+  theme_bw() + theme(legend.position =  "none") +
+scale_fill_viridis_d() +
+  scale_color_viridis_d() + 
+  scale_alpha(range=c(1,0))
 
+ggplot(Star_dat,aes(x=dec,y=ra,group=labels,color=labels)) + 
+  geom_point() +
+  facet_wrap(.~labels) +
+  theme_bw() + theme(legend.position =  "none") + 
+  scale_alpha(range=c(1,0))
 
-plot_ly(Star_dat, x = ~pmra,  y = ~parallax, z = ~-pmdec,color = ~labels) %>%
-  add_markers() %>%
-  layout(scene = list(xaxis = list(title = 'pmra'),
-                      yaxis = list(title = 'parallax [mas]'),
-                      zaxis = list(title = 'pmdec')))
-
-
-
-ggplot(Star_dat,aes(x= bp.rp,y=phot_g_mean_mag,group=labels,color = parallax, alpha=0.1)) + 
+ggplot(Star_dat,aes(x= bp.rp,y=phot_g_mean_mag,group=labels,color = parallax)) + 
   geom_point(size=0.2) + facet_wrap(.~labels) +
   theme_bw() + theme() +
-  #  geom_density2d() +
-  scale_y_reverse() + scale_color_viridis_c()
+  scale_y_reverse() + scale_color_viridis_c() + 
+scale_alpha(range=c(1,0))
 
 
-ggplot(Star_dat,aes(x=pmra,y=pmdec,group=labels,color=labels,alpha=0.1)) + 
-  geom_point() + 
-  #  facet_wrap(.~labels) +
-  theme_light() + theme(legend.position =  "none") +
-  geom_voronoi_tile(aes(fill = labels), normalize = TRUE) +
-  geom_voronoi_segment(normalize = TRUE) +
-  scale_fill_viridis_d() +
-  scale_color_viridis_d()
-
-
-ggplot(Star_dat,aes(x=ra,y=dec,group=labels,color=labels,alpha=0.1)) + 
-#  geom_point() +
-  facet_wrap(.~labels) +
-  theme_bw() + theme(legend.position =  "none") +
-  geom_density2d()
-
-
+ggplot(Star_dat,aes(x= phot_g_mean_mag,y=parallax,group=labels,color = parallax)) + 
+  geom_point(size=0.2) + facet_wrap(.~labels,scales = "free") +
+  theme_bw() + theme() +
+  scale_y_reverse() + scale_color_viridis_c() + 
+  scale_alpha(range=c(1,0))
 
 
 
@@ -82,6 +65,18 @@ ggplot(Star_dat,aes(x= bp.rp,y=phot_g_mean_mag)) +
   theme_bw() + theme() +
   #  geom_density2d() +
   scale_y_reverse() + scale_color_viridis_c()
+
+
+plot_ly(Star_dat, x = ~pmra,  y = ~parallax, z = ~-pmdec,color = ~labels) %>%
+  add_markers() %>%
+  layout(scene = list(xaxis = list(title = 'pmra'),
+                      yaxis = list(title = 'parallax [mas]'),
+                      zaxis = list(title = 'pmdec')))
+Star_cut <- Star_dat[Star_CL$classification  %in% c(1,11),]
+Star_cutCL <- Mclust(Star_cut[,c("pmra","pmdec")],G=20)
+
+Starcut_labels <- Star_cutCL$classification
+Star_cut$labels <- as.factor(Starcut_labels )
 
 
 
